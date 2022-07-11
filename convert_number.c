@@ -1,101 +1,157 @@
 #include "main.h"
 
-/**
- * print_hex - prints unsigned hex numbers in lowercase
- * @ap: the argument pointer
- * @params: the parameters struct
- *
- * Return: bytes printed
- */
-int print_hex(va_list ap, params_t *params)
-{
-unsigned long l;
-int c = 0;
-char *str;
+unsigned int convert_di(va_list args, buffer_t *output,
+unsigned char flags, int wid, int prec, unsigned char len);
+unsigned int convert_b(va_list args, buffer_t *output,
+unsigned char flags, int wid, int prec, unsigned char len);
+unsigned int convert_u(va_list args, buffer_t *output,
+unsigned char flags, int wid, int prec, unsigned char len);
+unsigned int convert_o(va_list args, buffer_t *output,
+unsigned char flags, int wid, int prec, unsigned char len);
 
-if (params->l_modifier)
-l = (unsigned long)va_arg(ap, unsigned long);
-else if (params->h_modifier)
-l = (unsigned short int)va_arg(ap, unsigned int);
+/**
+ * convert_di - Converts an argument to a signed int and
+ *              stores it to a buffer contained in a struct.
+ * @args: A va_list pointing to the argument to be converted.
+ * @flags: Flag modifiers.
+ * @wid: A width modifier.
+ * @prec: A precision modifier.
+ * @len: A length modifier.
+ * @output: A buffer_t struct containing a character array.
+ *
+ * Return: The number of bytes stored to the buffer.
+ */
+unsigned int convert_di(va_list args, buffer_t *output,
+unsigned char flags, int wid, int prec, unsigned char len)
+{
+long int d, copy;
+unsigned int ret = 0, count = 0;
+char pad, space = ' ', neg = '-', plus = '+';
+if (len == LONG)
+d = va_arg(args, long int);
 else
-l = (unsigned int)va_arg(ap, unsigned int);
-str = convert(l, 16, CONVERT_UNSIGNED | CONVERT_LOWERCASE, params);
-if (params->hashtag_flag && l)
+d = va_arg(args, int);
+if (len == SHORT)
+d = (short)d;
+/* Handle space flag */
+if (SPACE_FLAG == 1 && d >= 0)
+ret += _memcpy(output, &space, 1);
+if (prec <= 0 && NEG_FLAG == 0) /* Handle width  */
 {
-*--str = 'x';
-*--str = '0';
-}
-params->unsign = 1;
-return (c += print_number(str, params));
-}
-
-/**
- * print_HEX - prints unsigned hex numbers in uppercase
- * @ap: the argument pointer
- * @params: the parameters struct
- *
- * Return: bytes printed
- */
-int print_HEX(va_list ap, params_t *params)
-{
-unsigned long l;
-int c = 0;
-char *str;
-
-if (params->l_modifier)
-l = (unsigned long)va_arg(ap, unsigned long);
-else if (params->h_modifier)
-l = (unsigned short int)va_arg(ap, unsigned int);
+if (d == LONG_MIN)
+count += 19;
 else
-l = (unsigned int)va_arg(ap, unsigned int);
-str = convert(l, 16, CONVERT_UNSIGNED, params);
-if (params->hashtag_flag && l)
 {
-*--str = 'X';
-*--str = '0';
+for (copy = (d < 0) ? -d : d; copy > 0; copy /= 10)
+count++;
 }
-params->unsign = 1;
-return (c += print_number(str, params));
+count += (d == 0) ? 1 : 0;
+count += (d < 0) ? 1 : 0;
+count += (PLUS_FLAG == 1 && d >= 0) ? 1 : 0;
+count += (SPACE_FLAG == 1 && d >= 0) ? 1 : 0;
+/* Handle plus flag when zero flag is active */
+if (ZERO_FLAG == 1 && PLUS_FLAG == 1 && d >= 0)
+ret += _memcpy(output, &plus, 1);
+/*Print negative sign when zero flag is active */
+if (ZERO_FLAG == 1 && d < 0)
+ret += _memcpy(output, &neg, 1);
+pad = (ZERO_FLAG == 1) ? '0' : ' ';
+for (wid -= count; wid > 0; wid--)
+ret += _memcpy(output, &pad, 1);
 }
-/**
- * print_binary - prints unsigned binary number
- * @ap: the argument pointer
- * @params: the parameters struct
- *
- * Return: bytes printed
- */
-int print_binary(va_list ap, params_t *params)
-{
-unsigned int n = va_arg(ap, unsigned int);
-char *str = convert(n, 2, CONVERT_UNSIGNED, params);
-int c = 0;
-if (params->hashtag_flag && n)
-*--str = '0';
-params->unsign = 1;
-return (c += print_number(str, params));
+/* Print negative sign when zero flag is not active */
+if (ZERO_FLAG == 0 && d < 0)
+ret += _memcpy(output, &neg, 1);
+/* Handle plus flag when zero flag is not active */
+if (ZERO_FLAG == 0 && (PLUS_FLAG == 1 && d >= 0))
+ret += _memcpy(output, &plus, 1);
+if (!(d == 0 && prec == 0))
+ret += convert_sbase(output, d, "0123456789",
+flags, 0, prec);
+ret += print_neg_width(output, ret, flags, wid);
+return (ret);
 }
 
 /**
- * print_octal - prints unsigned octal numbers
- * @ap: the argument pointer
- * @params: the parameters struct
+ * convert_b - Converts an unsigned int argument to binary
+ *             and stores it to a buffer contained in a struct.
+ * @args: A va_list pointing to the argument to be converted.
+ * @flags: Flag modifiers.
+ * @wid: A width modifier.
+ * @prec: A precision modifier.
+ * @len: A length modifier.
+ * @output: A buffer_t struct containing a character array.
  *
- * Return: bytes printed
+ * Return: The number of bytes stored to the buffer.
  */
-int print_octal(va_list ap, params_t *params)
+unsigned int convert_b(va_list args, buffer_t *output,
+unsigned char flags, int wid, int prec, unsigned char len)
 {
-unsigned long l;
-char *str;
-int c = 0;
-if (params->l_modifier)
-l = (unsigned long)va_arg(ap, unsigned long);
-else if (params->h_modifier)
-l = (unsigned short int)va_arg(ap, unsigned int);
+unsigned int num;
+num = va_arg(args, unsigned int);
+(void)len;
+return (convert_ubase(output, num, "01", flags, wid, prec));
+}
+
+/**
+ * convert_o - Converts an unsigned int to octal and
+ *             stores it to a buffer contained in a struct.
+ * @args: A va_list poinitng to the argument to be converted.
+ * @flags: Flag modifiers.
+ * @wid: A width modifier.
+ * @prec: A precision modifier.
+ * @len: A length modifier.
+ * @output: A buffer_t struct containing a character array.
+ *
+ * Return: The number of bytes stored to the buffer.
+ */
+unsigned int convert_o(va_list args, buffer_t *output,
+unsigned char flags, int wid, int prec, unsigned char len)
+{
+unsigned long int num;
+unsigned int ret = 0;
+char zero = '0';
+if (len == LONG)
+num = va_arg(args, unsigned long int);
 else
-l = (unsigned int)va_arg(ap, unsigned int);
-str = convert(l, 8, CONVERT_UNSIGNED, params);
-if (params->hashtag_flag && l)
-*--str = '0';
-params->unsign = 1;
-return (c += print_number(str, params));
+num = va_arg(args, unsigned int);
+if (len == SHORT)
+num = (unsigned short)num;
+if (HASH_FLAG == 1 && num != 0)
+ret += _memcpy(output, &zero, 1);
+if (!(num == 0 && prec == 0))
+ret += convert_ubase(output, num, "01234567",
+flags, wid, prec);
+ret += print_neg_width(output, ret, flags, wid);
+return (ret);
+}
+
+/**
+ * convert_u - Converts an unsigned int argument to decimal and
+ *             stores it to a buffer contained in a struct.
+ * @args: A va_list pointing to the argument to be converted.
+ * @flags: Flag modifiers.
+ * @wid: A width modifier.
+ * @prec: A precision modifier.
+ * @len: A length modifier.
+ * @output: A buffer_t struct containing a character array.
+ *
+ * Return: The number of bytes stored to the buffer.
+ */
+unsigned int convert_u(va_list args, buffer_t *output,
+unsigned char flags, int wid, int prec, unsigned char len)
+{
+unsigned long int num;
+unsigned int ret = 0;
+if (len == LONG)
+num = va_arg(args, unsigned long int);
+else
+num = va_arg(args, unsigned int);
+if (len == SHORT)
+num = (unsigned short)num;
+if (!(num == 0 && prec == 0))
+ret += convert_ubase(output, num, "0123456789",
+flags, wid, prec);
+ret += print_neg_width(output, ret, flags, wid);
+return (ret);
 }
